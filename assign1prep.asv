@@ -54,14 +54,4 @@ title('Frequency Response Estimate (Multi-sine)');
 % At low frequencies, the system attenuates input signals and shows a phase
 % shift around -90 degrees, which suggests it behaves like an integrator.
 % Something you'd expect from a mass-spring-damper system where force is
-% integrated into velocity and then position. In the mid-frequency range,
-% there are two bumps in the magnitude plot that line up with quick drops
-% in the phase, pointing to resonance happening at those frequencies. This
-% fits with what you would expect from a fourth-order system that has two
-% natural frequencies. At high frequencies, the system starts to block
-% signals more strongly, and the magnitude also drops fast. So, it is
-% acting like a low-pass filter. The phase is messy in this range.
-% Probably, because the signal is so weak it gets lost in the noise. Which
-% makes the phase info unreliable. 
-
-%% Assignment 1.b:
+% integrated into velocity and then position. In the mid-frequency 
