@@ -25,13 +25,13 @@ data_prbs = detrend(data_prbs); % DC offset remove
 
 figure(1);
 impulse_prbs = cra(data_prbs, 200, 10);
-title('Impulse Response Estimate (PRBS)');
+title('Impulse response estimate (PRBS)');
 
 figure(2);
 freq_prbs = spa(data_prbs);
 bodeplot(freq_prbs);
 grid on;
-title('Frequency Response Estimate (PRBS)');
+title('Frequency response estimate (PRBS)');
 
 % multi-sine
 r = idinput(N,'sine',[4/50-1/N 40/50+1/N],0.1*[-1 1],[10 10 1]);
@@ -54,4 +54,126 @@ title('Frequency Response Estimate (Multi-sine)');
 % At low frequencies, the system attenuates input signals and shows a phase
 % shift around -90 degrees, which suggests it behaves like an integrator.
 % Something you'd expect from a mass-spring-damper system where force is
-% integrated into velocity and then position. In the mid-frequency 
+% integrated into velocity and then position. In the mid-frequency range,
+% there are two bumps in the magnitude plot that line up with quick drops
+% in the phase, pointing to resonance happening at those frequencies. This
+% fits with what you would expect from a fourth-order system that has two
+% natural frequencies. At high frequencies, the system starts to block
+% signals more strongly, and the magnitude also drops fast. So, it is
+% acting like a low-pass filter. The phase is messy in this range.
+% Probably, because the signal is so weak it gets lost in the noise. Which
+% makes the phase info unreliable. 
+
+%% Assignment 1.b: 
+na = 4;
+nb = 4;
+nc = 4;
+nd = 4;
+nf = 4; 
+nk = 1; % Input delay
+
+% OE model
+model_oe = oe(data_prbs, [nb nf nk]);
+
+% ARX model
+model_arx = arx(data_prbs, [na nb nk]);
+
+% ARMAX model
+model_armax = armax(data_prbs, [na nb nc nk]);
+
+% Box-Jenkins (BJ) model
+model_bj = bj(data_prbs, [nb nc nd nf nk]);
+
+% Frequency domain
+figure(4);
+bodeplot(freq_prbs, model_oe, model_arx, model_armax, model_bj);
+grid on;
+legend('Non-parametric (spa)', 'OE(4,4,1)', 'ARX(4,4,1)', 'ARMAX(4,4,1)', 'BJ(4,4,1)');
+title('Frequency response: parametric vs. non-parametric');
+
+% Time domain validation
+figure(5);
+compare(data_prbs, model_oe, model_arx, model_armax, model_bj);
+title('Time domain: measured output vs. simulated model outputs');
+
+% OE plots
+% Comparison in frequency domain OE
+figure(6);
+bodeplot(freq_prbs, model_oe); 
+grid on;
+legend('Non-parametric (spa)', 'Parametric (oe441)');
+title('Frequency response: parametric vs. non-parametric');
+
+% Comparison in time domain 
+figure(7);
+compare(data_prbs, model_oe);
+title('Time domain: measured output vs. simulated model output');
+
+
+% Pole-zero plot OE
+figure(8);
+pzmap(model_oe);
+grid on;
+title('Pole-zero plot for oe441 model');
+
+[p, z] = pzmap(model_oe);
+fprintf('Poles of the OE model:\n');
+disp(p)
+
+fprintf('Zeros of the OE model:\n');
+disp(z)
+
+
+% Based on the poles and zeros, it seems that the fourth-order model is a
+% good fit. There is no overlap between the poles and zeros. When they are
+% too close together, they can cancel each other out, which often means the
+% model is more complex than it needs to be. This is not happening here. So
+% the model is appropriate. The model is also stable because all the poles
+% lie within the unit circle. The magnitudes of the poles are slightly
+% below one, which means the system behaves well over time and does not
+% converge. 
+
+%% Assignment 1.c:
+ts = 0.01;
+Cz_num = [61.4, 3.554, -57.85];
+Cz_den = [1, -1.082, 0.2925];
+
+ref.time = [];
+ref.signals.values = idinput(N, 'prbs');
+
+% Run the closed-loop simulation
+sim('assign1cl.mdl');
+
+% Create an iddata object from the resulting system input (u) and output (y)
+% Note: We use u.signals.values, NOT r.signals.values, for direct identification.
+data_cl = iddata(y.signals.values, u.signals.values, ts);
+data_cl = detrend(data_cl); % Remove DC offset
+
+% --- Step 2: Estimate a Parametric Model from Closed-Loop Data ---
+
+% We use the direct identification method, treating the measured u and y
+% as our data. We will use the same model structure (OE 4,4,1) that we
+% found to be effective in the open-loop case (part 1b).
+disp('Estimating OE model from closed-loop data...');
+model_oe_cl = oe(data_cl, [4 4 1]);
+
+% --- Step 3: Compare Open-Loop and Closed-Loop Results ---
+
+% The key part of this assignment is to compare the model estimated under
+% closed-loop conditions with the one from the open-loop experiment.
+disp('Comparing open-loop and closed-loop model estimates...');
+
+figure(9);
+bodeplot(model_oe, model_oe_cl);
+grid on;
+legend('Open-Loop Estimate (model\_oe)', 'Closed-Loop Estimate (model\_oe\_cl)');
+title('Frequency Response: Open-Loop vs. Direct Closed-Loop Identification');
+
+% Also, compare the pole-zero maps
+figure(10);
+pzmap(model_oe, model_oe_cl);
+grid on;
+legend('Open-Loop Estimate', 'Closed-Loop Estimate');
+title('Pole-Zero Map: Open-Loop vs. Closed-Loop Identification');
+
+disp('--- Closed-loop identification complete ---');
